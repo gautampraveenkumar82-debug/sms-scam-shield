@@ -70,3 +70,4 @@ if st.button("🔍 Scan Message", type="primary"):
 
 st.divider()
 st.caption("SMS Scam Shield | Machine Learning Project")
+st.caption("Made with ❤️ by Praveen")
