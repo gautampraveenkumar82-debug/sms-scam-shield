@@ -565,14 +565,15 @@ with tab1:
         show_scan_result(sms_text)
 
 
+
 # --------------------------------------------------
 # TAB 2: SCREENSHOT OCR
 # --------------------------------------------------
 with tab2:
     st.markdown("### Scan a message screenshot")
     st.write(
-        "Upload a screenshot containing an SMS. OCR will try to extract "
-        "the text before the ML scan."
+        "Upload an SMS screenshot. Extract the text and analyze it "
+        "using your trained ML model."
     )
 
     uploaded_image = st.file_uploader(
@@ -582,9 +583,15 @@ with tab2:
     )
 
     if uploaded_image is not None:
-        if OCR_AVAILABLE:
+        if not OCR_AVAILABLE:
+            st.error(
+                "OCR libraries are missing. Add pillow and pytesseract "
+                "to requirements.txt."
+            )
+        else:
             try:
-                image = Image.open(uploaded_image)
+                image = Image.open(uploaded_image).convert("RGB")
+
                 st.image(
                     image,
                     caption="Uploaded screenshot",
@@ -596,22 +603,41 @@ with tab2:
                     key="extract_ocr",
                     use_container_width=True,
                 ):
-                    extracted_text = pytesseract.image_to_string(image).strip()
-                    st.session_state["extracted_sms"] = extracted_text
+                    with st.spinner("Extracting text from image..."):
+                        # Improve OCR on small or low-resolution screenshots
+                        from PIL import ImageEnhance, ImageFilter
+
+                        image = ImageEnhance.Contrast(image).enhance(1.5)
+                        image = image.filter(ImageFilter.SHARPEN)
+
+                        extracted_text = pytesseract.image_to_string(
+                            image,
+                            config="--psm 6",
+                        ).strip()
+
+                        # IMPORTANT: update the same state key used by
+                        # the text area, so the extracted text appears.
+                        st.session_state["ocr_text"] = extracted_text
+
+                        if extracted_text:
+                            st.success("Text extracted successfully!")
+                        else:
+                            st.warning(
+                                "No text detected. Try a clearer, "
+                                "cropped screenshot."
+                            )
 
             except Exception as exc:
-                st.error(f"Could not read this image: {exc}")
-        else:
-            st.error(
-                "OCR dependencies are missing. Install Pillow and pytesseract, "
-                "and install the Tesseract OCR engine."
-            )
+                st.error(
+                    "OCR failed. Check whether Tesseract is installed "
+                    f"on the server. Details: {exc}"
+                )
 
     extracted_sms = st.text_area(
         "Extracted SMS text (you can edit it)",
-        value=st.session_state.get("extracted_sms", ""),
-        height=150,
+        height=170,
         key="ocr_text",
+        placeholder="Extracted SMS text will appear here...",
     )
 
     if st.button(
@@ -620,6 +646,7 @@ with tab2:
         use_container_width=True,
     ):
         show_scan_result(extracted_sms)
+
 
 
 # --------------------------------------------------
